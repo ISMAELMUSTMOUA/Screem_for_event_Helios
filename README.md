@@ -161,7 +161,7 @@ Este proyecto es parte del Helios Race UPV. Consulta el archivo LICENSE para má
 
 ## 👨‍💻 Autor
 
-**Ismael Mustmoua**  
+**Ismael Mustafa**  
 GitHub: [@ISMAELMUSTMOUA](https://github.com/ISMAELMUSTMOUA)
 
 ---
