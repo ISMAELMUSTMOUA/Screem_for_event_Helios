@@ -148,8 +148,8 @@ Para mejor rendimiento, ajusta la velocidad SPI:
 
 **Helios** es un club de generación espontánea de la **Universidad Politécnica de Valencia (UPV)** dedicado al diseño y construcción de un **coche eléctrico de competición**. Este proyecto forma parte del sistema de visualización e interfaz del vehículo.
 
-**Sitio Web**: [Helios UPV](https://helios.upv.es)  
-**Contacto**: proyecto-helios@upv.es
+**Sitio Web**: [Helios UPV](https://heliosraceupv.com)  
+**Contacto**: heliosraceupv@gmail.com
 
 ---
 
