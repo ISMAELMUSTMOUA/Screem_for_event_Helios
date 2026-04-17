@@ -14,6 +14,11 @@
 
 extern SPI_HandleTypeDef hspi1;
 
+//defineciones
+#define MODER_PC ((3U << (0 * 2)) | (3U << (1 * 2)) | (3U << (2 * 2))| (3U << (3 * 2)) | (3U << (4 * 2)) | (3U << (5 * 2)) | (3U << (6 * 2)) | (3U << (7 * 2))| (3U << (8 * 2)) | (3U << (9 * 2)))
+#define PUPDR_PC ((2U << (0 * 2)) | (2U << (1 * 2)) | (2U << (2 * 2))| (2U << (3 * 2)) | (2U << (4 * 2)) | (2U << (5 * 2)) | (2U << (6 * 2)) | (2U << (7 * 2))| (2U << (8 * 2)) | (2U << (9 * 2)))
+
+
 // ====================================================================
 // 1. LOS DATOS GRÁFICOS (Fuente y Logo)
 // ====================================================================
@@ -12894,10 +12899,10 @@ const uint16_t club_helios_565[]=  {
 // ====================================================================
 
 void botton_init(){
-	 // 1.Configurar PA1, 5, 4 y PB4 como Entrada con resistencia Pull-Up
-		RCC->AHB2ENR |= RCC_AHB2ENR_GPIOAEN;      // Reloj para PA1, PA4 y PA5
-	    RCC->AHB2ENR |= RCC_AHB2ENR_GPIOBEN;      // Reloj para PB4
+	//0.abelertsr el reloj de PAy PB, PC
+		RCC->AHB2ENR |= (RCC_AHB2ENR_GPIOAEN | RCC_AHB2ENR_GPIOBEN | RCC_AHB2ENR_GPIOCEN);      // Reloj para PA1, PA4 y PA5, PB5, y los de PC
 
+	// 1.Configurar PA1, 5, 4 y PB4 como Entrada con resistencia Pull-Down
 	    GPIOA->MODER &= ~((3U << (1 * 2)) | (3U << (4 * 2)) | (3U << (5 * 2))); // Modo Entrada (00) PA
 		GPIOA->PUPDR &= ~((3U << (1 * 2)) | (3U << (4 * 2)) | (3U << (5 * 2))); // Limpiar configuración previa
 		GPIOA->PUPDR |=  ((2U << (1 * 2)) | (2U << (4 * 2)) | (2U << (5 * 2))); // Activar resistencia Pull-Down (0)
@@ -12905,15 +12910,34 @@ void botton_init(){
 	    GPIOB->MODER &= ~(3U << (5 * 2));         // Modo Entrada (00) para PB4
 		GPIOB->PUPDR &= ~(3U << (5 * 2));         // Limpiar configuración previa
 		GPIOB->PUPDR |=  (2U << (5 * 2));         // Activar resistencia Pull-Down (0)
-
+	//2. Configuracion PC0 hasta PC9 como entradas PULL-Down
+		GPIOC->MODER &= ~(MODER_PC); // Modo Entrada (00) PA
+		GPIOC->PUPDR &= ~(MODER_PC); // Limpiar configuración previa
+		GPIOC->PUPDR |=  (PUPDR_PC); // Activar resistencia Pull-Down (0)
 
 }
 // Función que escanea todos los botones del volante
 uint8_t Leer_Botones(void) {
-    if ((GPIOA->IDR & (1 << 1)) != 0) return 1; // PA1 -> Botón 1
-    if ((GPIOA->IDR & (1 << 4)) != 0) return 2; // PA4 -> Botón 2
-    if ((GPIOA->IDR & (1 << 5)) != 0) return 3; // PA5 -> Botón 3
-    if ((GPIOB->IDR & (1 << 5)) != 0) return 4; // PB4 -> Botón 4
+
+	//--- Los 4 Botones Traseras ---
+		if ((GPIOA->IDR & (1 << 1)) != 0) return 1; // PA1 -> Botón 1
+		if ((GPIOA->IDR & (1 << 4)) != 0) return 2; // PA4 -> Botón 2
+		if ((GPIOA->IDR & (1 << 5)) != 0) return 3; // PA5 -> Botón 3
+		if ((GPIOB->IDR & (1 << 5)) != 0) return 4; // PB4 -> Botón 4
+
+    // --- LOS 5 DE LA IZQUIERDA (PC0 a PC4) ---
+        if ((GPIOC->IDR & (1 << 0)) != 0) return 5; // PC0
+        if ((GPIOC->IDR & (1 << 1)) != 0) return 6; // PC1
+        if ((GPIOC->IDR & (1 << 2)) != 0) return 7; // PC2
+        if ((GPIOC->IDR & (1 << 3)) != 0) return 8; // PC3
+        if ((GPIOC->IDR & (1 << 4)) != 0) return 9; // PC4
+
+    // --- LOS 5 DE LA DERECHA (PC5 a PC9) ---
+        if ((GPIOC->IDR & (1 << 5)) != 0) return 10; // PC5
+        if ((GPIOC->IDR & (1 << 6)) != 0) return 11; // PC6
+        if ((GPIOC->IDR & (1 << 7)) != 0) return 12; // PC7
+        if ((GPIOC->IDR & (1 << 8)) != 0) return 13; // PC8
+        if ((GPIOC->IDR & (1 << 9)) != 0) return 14; // PC9
 
     return 0; // Si llega aquí, es que no hay nada pulsado
 }
@@ -13081,7 +13105,7 @@ void ILI9488_DrawString(uint16_t x, uint16_t y, char *str, uint8_t r, uint8_t g,
 // 5. INTERFAZ HELIOS iESC
 // ====================================================================
 
-void Helios_DrawDashboard_Static(void) {
+void Helios_DrawDashboard_Static(int Pres_reuda) {
     ILI9488_FillScreen(0, 0, 0); 
 
     // --- ZONA SUPERIOR (Cabecera y Datos Core) ---
@@ -13105,7 +13129,13 @@ void Helios_DrawDashboard_Static(void) {
     // Fila 1
     ILI9488_DrawString(10, 220, "RPM:", 180, 180, 180, 0, 0, 0, 2);
     ILI9488_DrawString(165, 220, "TMP:", 180, 180, 180, 0, 0, 0, 2);
-    ILI9488_DrawString(325, 220, "PRS:", 180, 180, 180, 0, 0, 0, 2);
+    if(Pres_reuda == 2){
+    ILI9488_DrawString(325, 220, "PRS2:", 180, 180, 180, 0, 0, 0, 2);}
+    else if (Pres_reuda == 3){
+    ILI9488_DrawString(325, 220, "PRS3:", 180, 180, 180, 0, 0, 0, 2);
+    }
+    else { ILI9488_DrawString(325, 220, "PRS1:", 180, 180, 180, 0, 0, 0, 2);
+    }
     // Fila 2
     ILI9488_DrawString(10, 280, "VOL:", 180, 180, 180, 0, 0, 0, 2);
     ILI9488_DrawString(165, 280, "AMP:", 180, 180, 180, 0, 0, 0, 2);
@@ -13256,5 +13286,157 @@ void Helios_DrawRules_Static(void) {
     ILI9488_FillRect(0, 270, 480, 3, 50, 50, 50);
     ILI9488_DrawString(120, 290, "PRESS Left up TO RETURN", 100, 100, 100, 0, 0, 0, 2);
 }
+
+// ====================================================================
+// 7. MODO JUEGO: iESC REACTION CHALLENGE (FULL WHEEL EDITION)
+// ====================================================================
+
+void Helios_DrawGame_Static(void) {
+    ILI9488_FillScreen(0, 0, 0);
+    ILI9488_FillRect(0, 0, 480, 40, 0, 150, 0);
+    ILI9488_DrawString(80, 10, "iESC REACTION CHALLENGE", 255, 255, 255, 0, 150, 0, 2);
+
+    // Marcadores base
+    ILI9488_DrawString(30, 55, "SCORE: 000", 255, 255, 255, 0, 0, 0, 3);
+    ILI9488_DrawString(260, 55, "BEST: 000", 255, 215, 0, 0, 0, 0, 3);
+
+    // Instrucciones (Actualizadas para las dos manos)
+    ILI9488_FillRect(0, 250, 480, 2, 50, 50, 50);
+    ILI9488_DrawString(10, 260, "USE BOTH HANDS: B5-B8 (L) & B10-B13 (R)", 150, 150, 150, 0, 0, 0, 2);
+    ILI9488_DrawString(90, 290, "Press B14 (PC9) to EXIT", 100, 0, 0, 0, 0, 0, 2);
+}
+
+void Helios_RunGame(uint8_t boton_pulsado, uint32_t *puntuacion, uint8_t reset_juego) {
+    static int fase_juego = -1;
+    static uint32_t tiempo_inicio = 0;
+    static uint32_t tiempo_espera = 0; // Guarda cuánto vamos a esperar en esta ronda
+    static uint8_t evento_actual = 0;
+    static uint8_t dificultad = 1;
+
+    static uint32_t puntos_memoria = 999;
+    static uint32_t high_score = 0;
+    static uint32_t high_score_memoria = 999;
+
+    
+    static uint32_t ruleta = 0;
+    ruleta++;
+
+    uint32_t tiempo_actual = HAL_GetTick();
+    char str_buffer[30];
+
+    const uint8_t botones_validos[8] = {5, 6, 7, 8, 10, 11, 12, 13};
+
+    if (reset_juego == 1) {
+        fase_juego = -1;
+        tiempo_inicio = 0;
+        *puntuacion = 0;
+        puntos_memoria = 999;
+        high_score_memoria = 999;
+    }
+
+    if (*puntuacion != puntos_memoria && fase_juego >= 0) {
+        sprintf(str_buffer, "%03lu", *puntuacion);
+        ILI9488_DrawString(138, 55, str_buffer, 255, 255, 255, 0, 0, 0, 3);
+        puntos_memoria = *puntuacion;
+    }
+
+    if (high_score != high_score_memoria && fase_juego >= 0) {
+        sprintf(str_buffer, "%03lu", high_score);
+        ILI9488_DrawString(350, 55, str_buffer, 255, 215, 0, 0, 0, 0, 3);
+        high_score_memoria = high_score;
+    }
+
+    if (fase_juego == -1) {
+        if (tiempo_inicio == 0) {
+            ILI9488_FillRect(0, 90, 480, 150, 0, 0, 0);
+            ILI9488_DrawString(60, 100, "SELECT DIFFICULTY", 0, 255, 255, 0, 0, 0, 3);
+            ILI9488_DrawString(80, 150, "B5: EASY (Kids)", 0, 255, 0, 0, 0, 0, 2);
+            ILI9488_DrawString(80, 180, "B6: NORMAL", 255, 255, 0, 0, 0, 0, 2);
+            ILI9488_DrawString(80, 210, "B7: HARD (Pro)", 255, 0, 0, 0, 0, 0, 2);
+            tiempo_inicio = 1;
+        }
+        if (boton_pulsado == 5) { dificultad = 0; fase_juego = 0; tiempo_inicio = 0; }
+        if (boton_pulsado == 6) { dificultad = 1; fase_juego = 0; tiempo_inicio = 0; }
+        if (boton_pulsado == 7) { dificultad = 2; fase_juego = 0; tiempo_inicio = 0; }
+    }
+
+    else if (fase_juego == 0) {
+        if (tiempo_inicio == 0) {
+            ILI9488_FillRect(0, 90, 480, 150, 0, 0, 0);
+            ILI9488_DrawString(150, 150, "GET READY...", 255, 255, 0, 0, 0, 0, 3);
+            tiempo_inicio = tiempo_actual;
+
+            // Calculamos el tiempo que va a tardar UNA SOLA VEZ (entre 1s y 2.5s)
+            tiempo_espera = 1000 + (ruleta % 1500);
+        }
+
+        // Cuando pase el tiempo esperado...
+        if (tiempo_actual - tiempo_inicio > tiempo_espera) {
+
+            
+            uint8_t indice_random = ruleta % 8;
+            evento_actual = botones_validos[indice_random];
+
+            fase_juego = 1;
+            tiempo_inicio = tiempo_actual;
+
+            ILI9488_FillRect(0, 90, 480, 150, 255, 0, 0);
+
+            if (evento_actual <= 8) {
+                sprintf(str_buffer, "<-- LEFT: B%d", evento_actual);
+                ILI9488_DrawString(70, 140, str_buffer, 255, 255, 255, 255, 0, 0, 4);
+            } else {
+                sprintf(str_buffer, "RIGHT: B%d -->", evento_actual);
+                ILI9488_DrawString(50, 140, str_buffer, 255, 255, 255, 255, 0, 0, 4);
+            }
+        }
+    }
+
+    else if (fase_juego == 1) {
+        uint32_t tiempo_base; uint32_t resta_por_punto; uint32_t tiempo_minimo;
+
+        if (dificultad == 0) { tiempo_base = 2000; resta_por_punto = 10; tiempo_minimo = 800; }
+        else if (dificultad == 1) { tiempo_base = 1200; resta_por_punto = 20; tiempo_minimo = 450; }
+        else { tiempo_base = 800; resta_por_punto = 30; tiempo_minimo = 250; }
+
+        uint32_t tiempo_maximo = tiempo_base - (*puntuacion * resta_por_punto);
+        if (tiempo_maximo < tiempo_minimo) tiempo_maximo = tiempo_minimo;
+
+        if (tiempo_actual - tiempo_inicio > tiempo_maximo) {
+            fase_juego = 2; tiempo_inicio = 0;
+        } else if (boton_pulsado != 0) {
+            if (boton_pulsado == evento_actual) {
+                (*puntuacion)++;
+                if (*puntuacion > high_score) { high_score = *puntuacion; }
+
+                ILI9488_FillRect(0, 90, 480, 150, 0, 255, 0);
+                ILI9488_DrawString(120, 140, "PERFECT!", 0, 0, 0, 0, 255, 0, 4);
+
+                fase_juego = 0; tiempo_inicio = 0; HAL_Delay(350);
+            } else {
+                fase_juego = 2; tiempo_inicio = 0;
+            }
+        }
+    }
+
+    else if (fase_juego == 2) {
+        if (tiempo_inicio == 0) {
+            ILI9488_FillRect(0, 90, 480, 150, 0, 0, 0);
+            ILI9488_DrawString(100, 120, "CRASH! GAME OVER", 255, 0, 0, 0, 0, 0, 3);
+
+            if (*puntuacion > 0 && *puntuacion == high_score) {
+                ILI9488_DrawString(120, 160, "NEW HIGH SCORE!", 255, 215, 0, 0, 0, 0, 2);
+            }
+
+            ILI9488_DrawString(20, 210, "Press ANY Game Button to retry", 100, 100, 100, 0, 0, 0, 2);
+            tiempo_inicio = 1;
+        }
+
+        if ((boton_pulsado >= 5 && boton_pulsado <= 8) || (boton_pulsado >= 10 && boton_pulsado <= 13)) {
+            *puntuacion = 0; fase_juego = -1; tiempo_inicio = 0;
+        }
+    }
+}
+
 
 #endif /* INC_FONT_H_ */

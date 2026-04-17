@@ -141,9 +141,15 @@ int main(void)
 	        float amp_falso = 12.5;  // Consumo corriente
 	        int eta_horas = 3;       // Tiempo restante estimado
 	        int eta_minutos = 45;
-	//Variables genericas
-	uint8_t boton_anterior = 0;
-	uint32_t ultimo_tiempo = 0;
+			//Variables genericas
+			uint8_t boton_anterior = 0;
+			uint32_t ultimo_tiempo = 0;
+			uint32_t puntos_juego = 0;
+			uint8_t pulso_limpio = 0;
+			int neumatico_seleccionado = 1;
+
+
+
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
@@ -157,82 +163,131 @@ int main(void)
 	        // 1. LEER BOTONES A MÁXIMA VELOCIDAD (Millones de veces por segundo)
 	        // ================================================================
 	        uint8_t boton_actual = Leer_Botones();
+	        pulso_limpio = 0;
 
 	        if (boton_actual != 0 && boton_anterior == 0) {
-	            switch (boton_actual) {
-	                case 1:
-	                    if (estado_pantalla == 0) { estado_pantalla = 1; }
-	                    else { estado_pantalla = 0; }
-	                    actualizar_pantalla = 1;
-	                    break;
-	                case 2:
-	                    if (modo_eco == 1) { modo_eco = 0; } else { modo_eco = 1; }
-	                    break;
-	                case 3:
-	                    eta_horas = 3; eta_minutos = 0;
-	                    break;
-	                case 4:
-	                    break;
-	            }
-	        }
-	        boton_anterior = boton_actual;
+	             pulso_limpio = boton_actual; // ¡Detectada una pulsación nueva!
 
-	        // ================================================================
-	        // 2. GESTIÓN INMEDIATA DE PANTALLAS (Respuesta instantánea)
-	        // ================================================================
-	        if (actualizar_pantalla == 1) {
-	            if (estado_pantalla == 0) {
-	                Helios_DrawDashboard_Static();
-	                // Forzamos pintar los números al instante para que no salga vacío
-	                Helios_UpdateTelemetry(velocidad_falsa, bateria_falsa, modo_eco,
-	                                       temp_falsa, pre_falsa, rpm_falsas,
-	                                       volt_falso, amp_falso, eta_horas, eta_minutos, 1);
-	            } else if (estado_pantalla == 1) {
-	                Helios_DrawRules_Static();
-	            }
-	            actualizar_pantalla = 0;
-	        }
+	             // --- NAVEGACIÓN ENTRE PANTALLAS ---
+	             if (pulso_limpio == 1) {
+	                 // Botón 1 (PA1): Alterna Telemetría y Reglamento
+	                 if (estado_pantalla == 0) estado_pantalla = 1;
+	                 else if(estado_pantalla == 1 || estado_pantalla == 2) estado_pantalla = 0;
+	                 actualizar_pantalla = 1;
+	             }
+	             else if (pulso_limpio == 4 && estado_pantalla == 0) {
+	                 // Botón 4 (PB5): Si estamos en Telemetría, ENTRAR AL JUEGO
+	                 estado_pantalla = 2;
+	                 actualizar_pantalla = 1;
+	             }
+	             else if (pulso_limpio == 14 && estado_pantalla == 2) {
+	                 // Botón 14 (PC9 - Extremo Derecho): BOTÓN DE PÁNICO. Salir del juego a la fuerza.
+	                 estado_pantalla = 0;
+	                 actualizar_pantalla = 1;
+	             }
 
-	        // ================================================================
-	        // 3. TAREAS PESADAS (Sensores y Refresco): SOLO CADA 500ms
-	        // ================================================================
-	        // Si el reloj actual menos el último tiempo guardado es mayor a 500ms...
+	             // --- ACCIONES DE TELEMETRÍA (Solo funcionan si vemos el Dashboard) ---
+	             else if (estado_pantalla == 0) {
+	                 switch (pulso_limpio) {
+	                     case 2: // Botón 2 (PA4): Modo ECO / RACE
+	                         if (modo_eco == 1) { modo_eco = 0; } else { modo_eco = 1; }
+	                         break;
+	                     case 3: // Botón 3 (PA5): Resetear reloj
+	                         eta_horas = 3; eta_minutos = 0;
+	                         break;
+	                     // Aquí puedes añadir del case 5 al 14 para encender luces, bomba de agua, etc.
+						   case 5:  // Botón 5 (PC0) cambia de rueda 1 -> 2 -> 3 -> 1...
+							   neumatico_seleccionado++;
+							   if (neumatico_seleccionado > 3) {
+								   neumatico_seleccionado = 1;
+							   }
 
-	        if (HAL_GetTick() - ultimo_tiempo >= 500) {
+							   // Borramos SOLO el cuadradito donde pone "PRS1:" (Fondo negro)
+								   ILI9488_FillRect(325, 220, 65, 20, 0, 0, 0);
 
-	            ultimo_tiempo = HAL_GetTick(); // Reseteamos el cronómetro
+								   // Escribimos el nuevo texto de la rueda
+								   if (neumatico_seleccionado == 1) ILI9488_DrawString(325, 220, "PRS1:", 180, 180, 180, 0, 0, 0, 2);
+								   else if (neumatico_seleccionado == 2) ILI9488_DrawString(325, 220, "PRS2:", 180, 180, 180, 0, 0, 0, 2);
+								   else ILI9488_DrawString(325, 220, "PRS3:", 180, 180, 180, 0, 0, 0, 2);
 
-	            // A. Simulamos los sensores
-	            velocidad_falsa++;
-	            if (velocidad_falsa > 99) velocidad_falsa = 40;
-	            rpm_falsas = velocidad_falsa * 60;
+								   // Forzamos que se repinten los números de la telemetría (enviando el 1 al final)
+								   Helios_UpdateTelemetry(velocidad_falsa, bateria_falsa, modo_eco,
+														  temp_falsa, pre_falsa, rpm_falsas,
+														  volt_falso, amp_falso, eta_horas, eta_minutos, 1);
 
-	            if (velocidad_falsa % 2 == 0) {
-	                bateria_falsa--;
-	                volt_falso -= 0.1;
-	                if (bateria_falsa < 0) { bateria_falsa = 100; volt_falso = 54.0; }
-	            }
-	            amp_falso = 10.0 + (velocidad_falsa / 10.0);
-	            temp_falsa++;
-	            if (temp_falsa > 85) temp_falsa = 70;
+							   // Levantamos bandera para que se repinte el fondo
+							   //actualizar_pantalla = 1;
+							   break;
+	                 }
+	             }
+	         }
+	         boton_anterior = boton_actual;
 
-	            eta_minutos--;
-	            if (eta_minutos < 0) {
-	                eta_minutos = 59; eta_horas--;
-	                if (eta_horas < 0) eta_horas = 3;
-	            }
+	         // ================================================================
+	         // 2. DIBUJO ESTÁTICO DE PANTALLAS (Solo cuando se cambia)
+	         // ================================================================
+	         if (actualizar_pantalla == 1) {
+	             if (estado_pantalla == 0) {
+	                 Helios_DrawDashboard_Static(neumatico_seleccionado);
+	                 // Forzamos el 1 al final para repintar la telemetría al volver
+	                 Helios_UpdateTelemetry(velocidad_falsa, bateria_falsa, modo_eco,
+	                                        temp_falsa, pre_falsa, rpm_falsas,
+	                                        volt_falso, amp_falso, eta_horas, eta_minutos, 1);
+	             } else if (estado_pantalla == 1) {
+	                 Helios_DrawRules_Static();
+	             } else if (estado_pantalla == 2) {
+	                 Helios_DrawGame_Static();
+	                 puntos_juego = 0; // El juego empieza con 0 puntos
+	                 Helios_RunGame(0, &puntos_juego, 1);
+	                 }
+	             actualizar_pantalla = 0; // Bajamos la bandera
+	         }
 
 
-	            // B. Actualizamos la pantalla (Solo si estamos en el Dashboard)
-	            if (estado_pantalla == 0 && actualizar_pantalla == 0) {
-	                Helios_UpdateTelemetry(velocidad_falsa, bateria_falsa, modo_eco,
-	                                       temp_falsa, pre_falsa, rpm_falsas,
-	                                       volt_falso, amp_falso, eta_horas, eta_minutos, 0);
-	            }
-	        }
+	         // ================================================================
+	         // 3. EJECUCIÓN DEL JUEGO (Alta Frecuencia)
+	         // ================================================================
+	         if (estado_pantalla == 2) {
+	             // El juego recibe el pulso_limpio para saber si el público ha pulsado los botones 1, 2, 3 o 4
+	             Helios_RunGame(pulso_limpio, &puntos_juego, 0);
+	         }
 
-	        // ¡NO HAY HAL_Delay(500) AQUÍ! El bucle sigue girando a la velocidad de la luz.
 
+	         // ================================================================
+	         // 4. CÁLCULO DE FÍSICAS (Solo cada 500ms)
+	         // ================================================================
+	         if (HAL_GetTick() - ultimo_tiempo >= 500) {
+
+	             ultimo_tiempo = HAL_GetTick(); // Reiniciar cronómetro
+
+	             // Simular físicas del coche (sigue pasando aunque estemos jugando)
+	             velocidad_falsa++;
+	             if (velocidad_falsa > 99) velocidad_falsa = 40;
+	             rpm_falsas = velocidad_falsa * 60;
+
+	             if (velocidad_falsa % 2 == 0) {
+	                 bateria_falsa--; volt_falso -= 0.1;
+	                 if (bateria_falsa < 0) { bateria_falsa = 100; volt_falso = 54.0; }
+	             }
+	             amp_falso = 10.0 + (velocidad_falsa / 10.0);
+
+	             temp_falsa++;
+	             if (temp_falsa > 85) temp_falsa = 70;
+
+	             eta_minutos--;
+	             if (eta_minutos < 0) {
+	                 eta_minutos = 59; eta_horas--;
+	                 if (eta_horas < 0) eta_horas = 3;
+	             }
+
+	             // Pintar métricas solo si estamos viendo el Dashboard
+	             if (estado_pantalla == 0 && actualizar_pantalla == 0) {
+	                 // Le pasamos 0 al final (anti-flickering activado)
+	                 Helios_UpdateTelemetry(velocidad_falsa, bateria_falsa, modo_eco,
+	                                        temp_falsa, pre_falsa, rpm_falsas,
+	                                        volt_falso, amp_falso, eta_horas, eta_minutos, 0);
+	             }
+	         }
   }
   /* USER CODE END 3 */
 }
