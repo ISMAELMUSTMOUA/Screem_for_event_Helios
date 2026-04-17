@@ -2,7 +2,7 @@
 
 ## 📋 Descripción del Proyecto
 
-Este proyecto contiene la configuración y driver para controlar la pantalla táctil **ILI9488** mediante el microcontrolador **STM32 G474 RE**. El código está diseñado para el **Proyecto Helios**, un club de generación espontánea de la UPV que está construyendo un **coche eléctrico**.
+Este proyecto contiene la configuración y driver para controlar la pantalla táctil **ILI9488** mediante el microcontrolador **STM32 G474 RE**. El código está diseñado para el **Helios race**, un club de generación espontánea de la UPV que está construyendo un **coche eléctrico**.
 
 ### Características principales:
 - ✅ Driver completo para pantalla ILI9488 (3.5 pulgadas)
